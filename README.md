@@ -1,6 +1,8 @@
-# AI-Driven Chaos Engineering
+# FaultOrbit
 
-An AI-assisted chaos-engineering system that injects **controlled failures** into a sandboxed cloud-native app, measures the impact, stops automatically when safety thresholds are breached, and explains weaknesses and fixes.
+**Safe, AI-assisted chaos engineering for microservices.** FaultOrbit injects controlled failures into a sandboxed cloud-native app, measures the impact, stops automatically when safety thresholds are breached, verifies recovery, and records every run for analysis.
+
+The target is [DeathStarBench Hotel Reservation](https://github.com/delimitrou/DeathStarBench/tree/master/hotelReservation): 24 containers (10 Go gRPC services, 8 MongoDB, 4 memcached, Consul, Jaeger) running locally on Docker Compose.
 
 ## Questions it answers
 
@@ -15,13 +17,13 @@ An AI-assisted chaos-engineering system that injects **controlled failures** int
 ```text
 Sample app (Docker Compose)
         │
-Dependency mapper ──► Experiment controller ──► Chaos tool (fault injection)
+Dependency map ──► Experiment controller ──► Fault injection (Docker, Pumba)
                               │
-                     Metrics / health monitor
+                     Health probes
                               │
                      Safety controller (auto-stop, kill switch, timeout)
                               │
-                     Results store ──► AI planner & analysis (Day 2)
+                     Results store ──► AI agents (planner, analyst)
 ```
 
 | Component | Where |
@@ -29,33 +31,41 @@ Dependency mapper ──► Experiment controller ──► Chaos tool (fault in
 | Sample app sandbox | `sandbox/hotel/` (DeathStarBench Hotel Reservation, 24 containers) |
 | Dependency map | `docs/dependency-map.json` (+ `.mmd` diagram) |
 | Experiment controller + health probes | `chaos/controller.py` |
-| Fault types | `chaos/faults.py` (container stop; network delay via Pumba in #28) |
+| Fault types | `chaos/faults.py`: container stop (Docker CLI), network delay ([Pumba](https://github.com/alexei-led/pumba)) |
 | Safety rules + results store | `chaos/hooks.py`, thresholds in `chaos/policy.json` |
-| AI planner / analysis | Day 2: #11, #13 |
+| AI planner / analyst | In progress (see [Roadmap](#roadmap)) |
 
-The controller enforces safety, not the AI. AI output is a recommendation, never a command.
+**The controller enforces safety, not the AI.** AI output is a recommendation, never a command.
 
-## Safety rules
+## Safety model
 
-- Runs only in our own local sandbox; never production, shared infra or other teams' containers.
-- Allowlisted containers and experiment types only.
-- Thresholds are set before each run, with a hard timeout and a manual kill switch.
-- The app must be confirmed healthy after every experiment.
+- Runs only in a local sandbox; never against production or shared infrastructure.
+- Allowlisted containers and fault types only, in `chaos/policy.json`. Experiments can't change the policy.
+- Pre-flight: refuses to inject if the baseline shows the app is already unhealthy.
+- Three auto-stop rules after every probe: consecutive failures, error rate over a rolling window, and p95 latency against a baseline-relative limit. Fail-safe on bad data or internal errors.
+- Hard timeout, Ctrl+C kill switch, and the fault is always restored. Recovery is verified, not assumed.
 
-## Status
+Details: [docs/SAFETY.md](docs/SAFETY.md).
 
-- **Sample app:** [DeathStarBench Hotel Reservation](https://github.com/delimitrou/DeathStarBench/tree/master/hotelReservation) (Apache-2.0). Go gRPC microservices with Consul, memcached, MongoDB, Jaeger tracing and a wrk2 load generator, all on Docker Compose.
-- **Chaos tool:** container stop via the Docker CLI; network faults via [Pumba](https://github.com/alexei-led/pumba) (chosen in #4; network delay lands with #28)
-- **Day 1:** sandbox running, dependency map, baseline, real faults injected, safety stop tested. Demo runbook: [docs/demo-day1.md](docs/demo-day1.md)
-- **Progress:** tracked on the [project board](https://github.com/users/Shaurya-34/projects/2)
-
-### Findings so far
+## Findings
 
 | Experiment | Result |
 |---|---|
 | Stop `memcached-rate` | `/hotels` fails, and **the `rate` service crashes**: it calls `log.Panic` on any cache error (`services/rate/server.go:114`). It doesn't recover until restarted by hand. The same pattern exists in profile, reservation and review |
-| Stop `geo` | `/hotels` fails (a hard dependency) and recovers about 1s after `geo` returns |
-| 200 ms network delay on `rate` | `/hotels` goes from 30–50 ms to **1.3–1.9 s, then times out (>2 s)**: one slow backend amplifies 6–10× at the edge. The latency/consecutive-failure safety stop fires; it recovers instantly once the delay is removed |
+| Stop `geo` | `/hotels` fails (a hard dependency) and recovers about 1 s after `geo` returns |
+| 200 ms network delay on `rate` | `/hotels` goes from 30–50 ms to **1.3–1.9 s, then times out (>2 s)**: one slow backend amplifies 6–10× at the edge. The safety stop fires; it recovers instantly once the delay is removed |
+
+These are defects in upstream DeathStarBench, surfaced automatically by the controller.
+
+## Roadmap
+
+- [x] Sandbox, dependency map, wrk2 baseline
+- [x] Experiment controller with container-stop and network-delay faults
+- [x] Safety controller and results store
+- [ ] Analyst agent: reads saved runs, ranks weaknesses by severity, suggests fixes, computes a resilience score
+- [ ] Planner agent: proposes the next experiment from the dependency map and past runs, validated against the policy
+- [ ] Closed loop with human approval: plan → approve → run → analyse
+- [ ] Fix `rate`'s cache crash and show the before/after
 
 ## Docs
 
@@ -63,11 +73,11 @@ The controller enforces safety, not the AI. AI output is a recommendation, never
 - [Dependency map](docs/dependency-map.json): machine-readable, used by the controller and the agents ([diagram](docs/dependency-map.mmd))
 - [Baseline](docs/baseline.md): wrk2 steady-state latency
 - [Safety controller and results store](docs/SAFETY.md)
-- [Day 1 demo runbook](docs/demo-day1.md) and [checkpoint pitch](docs/pitch-day1.md)
+- [Demo runbook](docs/demo.md)
 
 ## Setup
 
-### Hotel Reservation sandbox (issue #3)
+### Hotel Reservation sandbox
 
 Requires Git, Python 3.10+, Docker Engine/Desktop with a running **Linux** daemon,
 and Docker Compose v2.29.7 or later. On Windows, Docker Desktop with Linux
@@ -76,9 +86,9 @@ Reserve localhost ports 5000, 8500, and 16686.
 
 The eight core application services pull the immutable
 `deathstarbench/hotel-reservation` image. It is **linux/amd64**, verified from its
-registry image configuration. YashInani07 (M2) and krrishh17 (M5) therefore need
-amd64 emulation enabled in Docker Desktop or their Colima VM; the three amd64
-teammates can run it natively. Review and attractions build from the pinned
+registry image configuration. Apple Silicon hosts therefore need amd64
+emulation enabled in Docker Desktop or a Colima VM; Intel/AMD hosts run it
+natively. Review and attractions build from the pinned
 upstream source using the host's default build platform. MongoDB, Memcached,
 Consul, Jaeger, and the Go builder have arm64 and amd64 manifests.
 
@@ -156,7 +166,7 @@ MongoDB record, and checks Jaeger UI plus a reported frontend tracing service.
 It saves timestamped pass/fail evidence to `results/hotel-smoke-*.json` even if a
 check fails. Reservation requests are not automatically retried.
 
-This is a small API smoke run, not the fixed-rate wrk2 baseline required by #6.
+This is a small API smoke run, not the fixed-rate wrk2 baseline in [docs/baseline.md](docs/baseline.md).
 It uses seeded benchmark dates (2015-04-09 to 2015-04-10) and may consume one
 room per successful invocation. It checks container state for review and
 attractions, not their frontend RPC routes.
@@ -219,7 +229,7 @@ python -m unittest discover -s tests -p 'test_hotel_setup.py' -v
 ```
 
 **Verified end to end:** all 7 smoke checks pass on Windows 11 / Intel (amd64,
-Docker Desktop) from a fresh clone ([PR #30](https://github.com/Shaurya-34/Hackathon/pull/30)).
+Docker Desktop) from a fresh clone.
 The stack also runs on Apple Silicon (M2, M5) with amd64 emulation.
 
 ## Running experiments

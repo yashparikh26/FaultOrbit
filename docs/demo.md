@@ -1,10 +1,10 @@
-# Day 1 checkpoint demo
+# Demo runbook
 
 Goal: show the app running, one safe failure injected with visible impact, and the safety stop working. About 5 minutes.
 
 All commands run from the repo root in PowerShell (`python3` on macOS/Linux).
 
-## Pre-flight (before the mentor arrives)
+## Pre-flight
 
 ```powershell
 python sandbox/hotel/prepare.py
@@ -63,7 +63,7 @@ cd sandbox/hotel/.runtime; docker compose start rate; cd ../../..
 python -m chaos.hooks list
 ```
 
-Say: every run is saved with its config, the samples, the stop reason and the recovery outcome. Day 2 agents read these records: one plans experiments, one ranks findings. The controller, not the AI, enforces safety.
+Say: every run is saved with its config, the samples, the stop reason and the recovery outcome. These records are what the AI agents read: one plans experiments, one ranks findings. The controller, not the AI, enforces safety.
 
 ## If something goes wrong
 
