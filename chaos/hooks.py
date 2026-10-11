@@ -1,4 +1,4 @@
-"""Safety check (#8) and results store (#9) used by chaos/controller.py.
+"""Safety check and results store used by chaos/controller.py.
 
 The controller calls exactly two functions here; their signatures are fixed:
 
@@ -123,7 +123,7 @@ def check_baseline(baseline, policy):
 
 
 # --------------------------------------------------------------------------- #
-# #8  Safety check
+# Safety check
 # --------------------------------------------------------------------------- #
 
 class _RunState:
@@ -153,7 +153,7 @@ def reset_state():
 
 
 def should_stop(sample, baseline, policy):
-    """Safety check (#8). Called after every probe while a fault is active.
+    """Safety check. Called after every probe while a fault is active.
 
     sample:   {"t": float, "ok": bool, "status": int|None, "latency_ms": float}
     baseline: list of samples taken before the fault
@@ -214,7 +214,7 @@ def should_stop(sample, baseline, policy):
 
 
 # --------------------------------------------------------------------------- #
-# #9  Results store
+# Results store
 # --------------------------------------------------------------------------- #
 
 def _slug(name):
@@ -229,7 +229,7 @@ def _atomic_write(path, text):
 
 
 def save_result(record):
-    """Results store (#9). Persist one experiment record, return where it went.
+    """Results store. Persist one experiment record, return where it went.
 
     Writes results/<timestamp>-<name>-<id>.json (the full record plus a computed
     summary) and appends one line to results/index.jsonl for quick listing.

@@ -1,4 +1,4 @@
-"""Tests for chaos/hooks.py: safety check (#8) and results store (#9)."""
+"""Tests for chaos/hooks.py: safety check and results store."""
 
 import json
 import tempfile

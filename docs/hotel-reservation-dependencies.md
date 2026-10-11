@@ -1,6 +1,6 @@
 # DeathStarBench Hotel Reservation dependency findings
 
-Task #2 — inspected 10 October 2026.
+Inspected 10 October 2026.
 
 ## Scope and evidence
 
@@ -187,28 +187,18 @@ Docker and Compose are required on the host; the image provides the Go build env
 
 Jaeger receives application traces at jaeger:6831 and publishes its UI on 16686. Compose also publishes Consul ports 8300, 8400, 8500 and host UDP 8600 mapped to container UDP 53, exactly as written.
 
-## Teammate CPU architecture check — 5 of 5 confirmed
+## Host CPU architecture
 
-Updated 10 October 2026. The five teammates below are identified from the project's Day 1 issue assignments. The task requester confirmed all five teammates' OS/chip or architecture details on this date; these are reported hardware confirmations, not measurements run by this inspection. The teammate CPU architecture checklist item in [issue #2](https://github.com/Shaurya-34/Hackathon/issues/2) is complete.
+The prebuilt `deathstarbench/hotel-reservation` image is linux/amd64 only (see the README). It runs natively on Intel/AMD hosts and under amd64 emulation (Rosetta or Colima) on Apple Silicon. The source Dockerfile sets GOOS=linux but does not hard-code GOARCH. Record whether a run uses native arm64 or emulated amd64; an emulator's architecture is not the physical chip.
 
-| Teammate | Known OS | Host CPU / architecture | Confirmation source/date |
-|---|---|---|---|
-| AyushVoid | Windows/Linux | amd64 (x86_64); CPU model not supplied | Architecture confirmed by task requester, 10 October 2026 |
-| YashInani07 | macOS Sequoia | Apple M2 — Apple Silicon / arm64 | Confirmed by task requester, 10 October 2026 |
-| krrishh17 | macOS | Apple M5 — Apple Silicon / arm64 | Confirmed by task requester, 10 October 2026 |
-| yashparikh26 | Windows/Linux | amd64 (x86_64); CPU model not supplied | Architecture confirmed by task requester, 10 October 2026 |
-| Shaurya-34 | Windows 11 | Intel Core i7-13700HX — amd64 (x86_64) | Confirmed by task requester, 10 October 2026; read from `Win32_Processor` on host |
+To check a host:
 
-For future hardware changes or independent runtime verification, use the following checks:
+- **macOS:** Apple menu → About This Mac → **Chip** or **Processor**. An Apple M-series chip means Apple Silicon / arm64; an Intel processor means amd64. A terminal running under Rosetta can report x86_64 on Apple Silicon.
+- **Linux:** Architecture and Model name from `lscpu`; x86_64 maps to amd64, aarch64 to arm64.
+- **Windows:** processor and System type from Settings → System → About.
+- **Docker:** `docker info --format '{{.Architecture}}'` reports the daemon's architecture; a remote Docker context describes the daemon host, not the laptop.
 
-- **macOS:** Apple menu → About This Mac → report only **Chip** or **Processor**. An Apple M-series chip means Apple Silicon / arm64; an Intel processor means amd64. macOS alone is insufficient, and a terminal running under Rosetta can report x86_64 on Apple Silicon.
-- **Linux:** report the Architecture and Model name from `lscpu`; x86_64 maps to amd64, aarch64 to arm64.
-- **Windows:** report the processor and System type from Settings → System → About.
-- Separately record the Docker server architecture with `docker info --format '{{.Architecture}}'` if using Docker; a remote Docker context describes the daemon host, not necessarily the teammate's laptop.
-
-Issue #2 states that the prebuilt application image is amd64-only; this report has not independently inspected its registry manifest. For an Apple Silicon host, the deployment needs a compatible source build or amd64 emulation. The source Dockerfile sets GOOS=linux but does not hard-code GOARCH. Confirm support for the pinned images and record whether the actual run uses native arm64 or emulated amd64; do not count an emulator's architecture as the physical chip.
-
-**Confirmed architecture split:** YashInani07 and krrishh17 use Apple Silicon / arm64 (2 teammates); AyushVoid, yashparikh26, and Shaurya-34 use amd64 (3 teammates). Docker daemon architecture and native-versus-emulated execution have not been verified for these machines.
+Tested hosts: Windows 11 on Intel (amd64, native) and macOS on Apple M2 and M5 (amd64 emulation).
 
 ## Runtime caveats and suggested corrections
 

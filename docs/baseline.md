@@ -1,7 +1,7 @@
 # Hotel Reservation steady-state baseline
 
 Captured: 2026-10-10  
-Sandbox: Hackathon PR #30 setup, using its pinned Hotel Reservation images  
+Sandbox: the `sandbox/hotel` setup, using its pinned Hotel Reservation images  
 Faults: none (normal steady-state run)
 
 ## Workload
@@ -12,7 +12,7 @@ Faults: none (normal steady-state run)
 - Lua dependency: LuaSocket installed with `luarocks install luasocket`
 - The Linux ARM64 wrk2 container builds its own Linux LuaJIT from the mounted source copy. The source mount is read-only.
 
-The PR #30 `prepare.py` checks out only `hotelReservation/`, so first add the wrk2 source and its LuaJIT submodule (from the repo root):
+`sandbox/hotel/prepare.py` checks out only `hotelReservation/`, so first add the wrk2 source and its LuaJIT submodule (from the repo root):
 
 ```bash
 git -C sandbox/hotel/.runtime/DeathStarBench sparse-checkout add wrk2
@@ -36,10 +36,10 @@ docker run --rm --platform linux/arm64 --network hotel-sandbox_default \
 
 | Machine / host | wrk2 container platform | Requests | Throughput | Average | p50 | p90 | p99 | p99.9 | Errors/timeouts |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---|
-| Shaurya's machine (Windows 11, Intel i7-13700HX, amd64 host) | linux/amd64 | 3,001 | 50.01 req/s | Not captured | 4.6 ms | 11.8 ms | 17.4 ms | 22.9 ms | 0 socket errors, 0 non-2xx |
-| Krishna's MacBook Air M5 (arm64 host) | linux/arm64 | 3,001 | 50.00 req/s | 4.95 ms | 3.14 ms | 9.18 ms | 22.78 ms | 171.26 ms | No error/timeout lines in captured output; run completed at target throughput |
+| Windows 11, Intel i7-13700HX (amd64 host) | linux/amd64 | 3,001 | 50.01 req/s | Not captured | 4.6 ms | 11.8 ms | 17.4 ms | 22.9 ms | 0 socket errors, 0 non-2xx |
+| MacBook Air M5 (arm64 host) | linux/arm64 | 3,001 | 50.00 req/s | 4.95 ms | 3.14 ms | 9.18 ms | 22.78 ms | 171.26 ms | No error/timeout lines in captured output; run completed at target throughput |
 
-Krishna's app used the PR #30 pinned image, which the image lock identifies as linux/amd64. Docker Desktop had Rosetta enabled. The wrk2 generator ran as linux/arm64. The Mac result has a notably higher p99.9 tail than Shaurya's run; keep both sets of numbers when comparing machines.
+On the Mac, the app used the pinned image, which the image lock identifies as linux/amd64. Docker Desktop had Rosetta enabled. The wrk2 generator ran as linux/arm64. The Mac result has a notably higher p99.9 tail than the Windows run; keep both sets of numbers when comparing machines.
 
 ## Interpretation limits
 
