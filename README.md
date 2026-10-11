@@ -33,7 +33,7 @@ Dependency map ──► Experiment controller ──► Fault injection (Docker
 | Experiment controller + health probes | `chaos/controller.py` |
 | Fault types | `chaos/faults.py`: container stop (Docker CLI), network delay ([Pumba](https://github.com/alexei-led/pumba)) |
 | Safety rules + results store | `chaos/hooks.py`, thresholds in `chaos/policy.json` |
-| AI planner / analyst | In progress (see [Roadmap](#roadmap)) |
+| AI agents | `agents/`: model backends and safe JSON calls ready; analyst and planner in progress (see [Roadmap](#roadmap)) |
 
 **The controller enforces safety, not the AI.** AI output is a recommendation, never a command.
 
@@ -46,6 +46,23 @@ Dependency map ──► Experiment controller ──► Fault injection (Docker
 - Hard timeout, Ctrl+C kill switch, and the fault is always restored. Recovery is verified, not assumed.
 
 Details: [docs/SAFETY.md](docs/SAFETY.md).
+
+## AI backends
+
+Agents call a model through `agents/llm.py`, which asks for JSON matching a schema, validates the answer, retries once with the errors, and logs every call (backend, model, prompt version, duration, cost) to `results/llm_calls.jsonl`. Choose a backend with `FAULTORBIT_LLM`:
+
+| Backend | What it uses | Setup |
+|---|---|---|
+| `claude-code` (default) | Your Claude subscription through the [Claude Code](https://code.claude.com/docs/en/overview) CLI in print mode; no API key | Install Claude Code and log in once |
+| `ollama` | A local model (free, offline) | Install [Ollama](https://ollama.com), `ollama pull llama3.1:8b`, set `FAULTORBIT_OLLAMA_MODEL` to change it |
+| `fake` | Canned answers | Used by the tests; never calls a model |
+
+```powershell
+python -m agents.llm check            # uses FAULTORBIT_LLM, default claude-code
+python -m agents.llm check ollama
+```
+
+Optional settings: `FAULTORBIT_CLAUDE_MODEL` (e.g. `haiku`, `sonnet`), `FAULTORBIT_CLAUDE_BIN` (path to `claude` if it isn't on PATH), `OLLAMA_HOST`. The Claude Code call runs in an empty temporary folder with permission prompts denied, so the model only sees the prompt FaultOrbit sends.
 
 ## Findings
 
@@ -62,6 +79,7 @@ These are defects in upstream DeathStarBench, surfaced automatically by the cont
 - [x] Sandbox, dependency map, wrk2 baseline
 - [x] Experiment controller with container-stop and network-delay faults
 - [x] Safety controller and results store
+- [x] Agent foundation: model backends (Claude Code, Ollama), schema-checked JSON, call log
 - [ ] Analyst agent: reads saved runs, ranks weaknesses by severity, suggests fixes, computes a resilience score
 - [ ] Planner agent: proposes the next experiment from the dependency map and past runs, validated against the policy
 - [ ] Closed loop with human approval: plan → approve → run → analyse
