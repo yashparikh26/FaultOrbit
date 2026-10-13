@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FaultOrbit Dashboard</title>
+<style>
+/* Colour tokens: chart colours follow a validated palette; status colours are reserved for state. */
+:root {
+  color-scheme: light;
+  --bg: #f4f4f2;
+  --surface: #fcfcfb;
+  --border: #e3e2de;
+  --grid: #ecebe7;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --text-3: #75746f;
+  --series: #2a78d6;
+  --good: #0ca30c;
+  --critical: #d03b3b;
+  --band: rgba(208, 59, 59, 0.07);
+  --band-edge: rgba(208, 59, 59, 0.35);
+  --hover: #f0efeb;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --bg: #121211; --surface: #1a1a19; --border: #2e2e2c; --grid: #262624;
+    --text: #f0efec; --text-2: #c3c2b7; --text-3: #9b9a92;
+    --series: #3987e5; --band: rgba(208, 59, 59, 0.12); --band-edge: rgba(230, 103, 103, 0.5);
+    --hover: #232321;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121211; --surface: #1a1a19; --border: #2e2e2c; --grid: #262624;
+  --text: #f0efec; --text-2: #c3c2b7; --text-3: #9b9a92;
+  --series: #3987e5; --band: rgba(208, 59, 59, 0.12); --band-edge: rgba(230, 103, 103, 0.5);
+  --hover: #232321;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { background: var(--surface); border-bottom: 1px solid var(--border); }
+.bar { max-width: 1120px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 24px; }
+.brand { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
+.brand span { color: var(--text-3); font-weight: 500; }
+nav { display: flex; gap: 4px; }
+nav a { color: var(--text-2); text-decoration: none; padding: 6px 12px; border-radius: 6px; font-weight: 500; }
+nav a[aria-current="page"] { background: var(--hover); color: var(--text); }
+.spacer { flex: 1; }
+button, input { font: inherit; color: inherit; }
+.btn { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.btn:hover { background: var(--hover); }
+main { max-width: 1120px; margin: 0 auto; padding: 20px 16px 48px; }
+h1 { font-size: 20px; margin: 0 0 2px; letter-spacing: -0.01em; }
+.sub { color: var(--text-2); margin: 0 0 16px; }
+.banner { display: none; max-width: 1120px; margin: 12px auto 0; padding: 10px 14px; border-radius: 8px;
+  border: 1px solid var(--critical); color: var(--text); background: var(--band); font-weight: 500; }
+.banner.on { display: block; }
+.banner b { color: var(--critical); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.tile .label { color: var(--text-2); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+.tile .value { font-size: 24px; font-weight: 650; margin-top: 4px; letter-spacing: -0.02em; }
+.tile .value.small { font-size: 15px; font-weight: 600; line-height: 1.35; }
+.tile .note { color: var(--text-3); font-size: 12px; margin-top: 2px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.scroll { overflow-x: auto; }
+.card h2 { font-size: 15px; margin: 0 0 2px; }
+.card .sub { margin-bottom: 8px; font-size: 13px; }
+.toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.toolbar input[type=search], .toolbar input[type=text] { background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 10px; min-width: 240px; flex: 1; max-width: 520px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--text-2); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr.link { cursor: pointer; }
+tbody tr.link:hover, tbody tr.link:focus { background: var(--hover); outline: none; }
+.mono { font-family: var(--mono); font-size: 12px; color: var(--text-2); }
+.pill { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; white-space: nowrap; }
+.pill .ic { font-weight: 800; }
+.pill.good .ic { color: var(--good); }
+.pill.bad .ic { color: var(--critical); }
+.pill.neutral .ic { color: var(--text-3); }
+.empty { color: var(--text-2); padding: 28px 8px; text-align: center; }
+.empty code { font-family: var(--mono); background: var(--hover); padding: 2px 6px; border-radius: 4px; }
+.legend { display: flex; gap: 18px; flex-wrap: wrap; color: var(--text-2); font-size: 12px; margin: 4px 0 6px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+  display: none; white-space: nowrap; z-index: 5; }
+.tip strong { font-size: 13px; }
+.tip .muted { color: var(--text-2); }
+a { color: var(--series); }
+.back { display: inline-block; margin-bottom: 10px; color: var(--text-2); text-decoration: none; }
+.back:hover { color: var(--text); }
+details summary { cursor: pointer; color: var(--text-2); font-weight: 500; }
+.row-2 { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (max-width: 640px) {
+  .bar { gap: 12px; flex-wrap: wrap; }
+  .hide-sm { display: none; }
+  th, td { padding: 8px 6px; }
+  .pill { white-space: normal; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">FaultOrbit <span>dashboard</span></div>
+    <nav>
+      <a href="#/" id="nav-runs">Runs</a>
+      <a href="#/live" id="nav-live">Live</a>
+    </nav>
+    <div class="spacer"></div>
+    <button class="btn" id="theme" type="button" title="Toggle light/dark">Theme</button>
+  </div>
+</header>
+<div class="banner" id="banner" role="status" aria-live="polite"></div>
+<main id="app"></main>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------ helpers */
+const app = document.getElementById("app");
+const SVG = "http://www.w3.org/2000/svg";
+
+function el(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (v !== null && v !== undefined) n.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined)
+    n.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  return n;
+}
+function svg(tag, attrs = {}, text) {
+  const n = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+async function getJSON(url) {
+  const r = await fetch(url, { cache: "no-store" });
+  const body = await r.json();
+  if (!r.ok) throw new Error(body.error || r.statusText);
+  return body;
+}
+const fmtMs = v => v == null ? "–" : `${Math.round(v).toLocaleString()} ms`;
+const fmtS = v => v == null ? "–" : `${Number(v).toFixed(v < 10 ? 1 : 0)} s`;
+const fmtPct = v => v == null ? "–" : `${Math.round(v * 100)}%`;
+function runWhen(id) {          // run ids start with YYYYMMDD-HHMMSS
+  const m = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/.exec(id || "");
+  return m ? `${m[3]}/${m[2]} ${m[4]}:${m[5]}` : "";
+}
+function niceStep(range, target) {
+  const raw = range / Math.max(1, target), mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / mag;
+  return (n >= 5 ? 10 : n >= 2 ? 5 : n >= 1 ? 2 : 1) * mag;
+}
+function ticks(max, target) {
+  const step = niceStep(max, target), out = [];
+  for (let v = 0; v <= max + 1e-9; v += step) out.push(+v.toFixed(6));
+  return out;
+}
+function outcome(r) {           // the run's result as icon + words (never colour alone)
+  if ((r.stop_reason || "").startsWith("refused"))
+    return { cls: "neutral", ic: "–", text: "Refused" };
+  if (r.recovered) return { cls: "good", ic: "✓", text: `Recovered ${fmtS(r.recovery_s)}` };
+  return { cls: "bad", ic: "✕", text: "Not recovered" };
+}
+function pill(o) { return el("span", { class: `pill ${o.cls}` }, el("span", { class: "ic", "aria-hidden": "true" }, o.ic), o.text); }
+function tile(label, value, note, small) {
+  return el("div", { class: "tile" }, el("div", { class: "label" }, label),
+    el("div", { class: "value" + (small ? " small" : "") }, value), note ? el("div", { class: "note" }, note) : null);
+}
+
+/* ------------------------------------------------------------------ theme */
+(function theme() {
+  const root = document.documentElement;
+  try { const t = localStorage.getItem("fo-theme"); if (t) root.dataset.theme = t; } catch (e) {}
+  document.getElementById("theme").addEventListener("click", () => {
+    const dark = root.dataset.theme ? root.dataset.theme === "dark"
+      : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem("fo-theme", root.dataset.theme); } catch (e) {}
+    route();
+  });
+})();
+
+/* ------------------------------------------------------------------ active-fault banner */
+const banner = document.getElementById("banner");
+function showFault(f) {
+  banner.replaceChildren();
+  if (!f) { banner.classList.remove("on"); return; }
+  banner.append(el("b", {}, "● Fault active: "), `${f.fault} on ${f.target}`,
+    f.experiment ? ` (experiment ${f.experiment})` : "");
+  banner.classList.add("on");
+}
+async function pollStatus() {
+  try { showFault((await getJSON("/api/status")).active_fault); } catch (e) {}
+}
+setInterval(pollStatus, 3000); pollStatus();
+
+/* ------------------------------------------------------------------ timeline chart */
+/* points: [{x (s), y (ms), ok, status, phase}]; opts: band [x0,x1], limit (ms), stopX, xLabel */
+function timeline(points, opts = {}) {
+  const wrap = el("div", { class: "chart" });
+  const tip = el("div", { class: "tip", role: "tooltip" });
+  wrap.append(tip);
+  const W = Math.max(320, Math.min(1088, (app.clientWidth || 900) - 34));
+  const H = W < 560 ? 240 : 300;
+  const m = { t: 22, r: 16, b: 34, l: 56 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const xs = points.map(p => p.x);
+  const xMax = Math.max(opts.xMin || 0, ...(xs.length ? xs : [1]), opts.band ? opts.band[1] : 0) || 1;
+  const yMax = Math.max(100, ...points.map(p => p.y), opts.limit ? opts.limit * 1.15 : 0) * 1.08;
+  const X = v => m.l + (v / xMax) * iw, Y = v => m.t + ih - (v / yMax) * ih;
+  const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, role: "img",
+    "aria-label": opts.label || "Probe latency over time" });
+
+  // grid + y axis
+  for (const v of ticks(yMax, 5)) {
+    s.append(svg("line", { x1: m.l, x2: m.l + iw, y1: Y(v), y2: Y(v), stroke: "var(--grid)" }));
+    s.append(svg("text", { x: m.l - 8, y: Y(v) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--text-3)" },
+      v.toLocaleString()));
+  }
+  s.append(svg("text", { x: 12, y: m.t + ih / 2, transform: `rotate(-90 12 ${m.t + ih / 2})`,
+    "text-anchor": "middle", "font-size": 11, fill: "var(--text-2)" }, "latency (ms)"));
+  // x axis
+  for (const v of ticks(xMax, W < 560 ? 4 : 8)) {
+    s.append(svg("text", { x: X(v), y: m.t + ih + 18, "text-anchor": "middle", "font-size": 11, fill: "var(--text-3)" }, `${v}s`));
+  }
+  s.append(svg("line", { x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih, stroke: "var(--text-3)" }));
+  if (opts.xLabel) s.append(svg("text", { x: m.l + iw, y: H - 2, "text-anchor": "end", "font-size": 11, fill: "var(--text-2)" }, opts.xLabel));
+
+  // fault window
+  if (opts.band) {
+    const [a, b] = opts.band;
+    s.append(svg("rect", { x: X(a), y: m.t, width: Math.max(1, X(b) - X(a)), height: ih, fill: "var(--band)" }));
+    s.append(svg("line", { x1: X(a), x2: X(a), y1: m.t, y2: m.t + ih, stroke: "var(--band-edge)" }));
+    s.append(svg("line", { x1: X(b), x2: X(b), y1: m.t, y2: m.t + ih, stroke: "var(--band-edge)" }));
+    s.append(svg("text", { x: X(a) + 6, y: m.t + 12, "font-size": 11, fill: "var(--text-2)" }, "fault active"));
+  }
+  // latency limit
+  if (opts.limit) {
+    s.append(svg("line", { x1: m.l, x2: m.l + iw, y1: Y(opts.limit), y2: Y(opts.limit),
+      stroke: "var(--text-2)", "stroke-dasharray": "5 4" }));
+    s.append(svg("text", { x: m.l + iw, y: Y(opts.limit) - 5, "text-anchor": "end", "font-size": 11, fill: "var(--text-2)" },
+      `latency limit ${fmtMs(opts.limit)}`));
+  }
+  // safety stop
+  if (opts.stopX != null) {
+    s.append(svg("line", { x1: X(opts.stopX), x2: X(opts.stopX), y1: m.t - 6, y2: m.t + ih,
+      stroke: "var(--text)", "stroke-width": 1.5 }));
+    const nearEdge = X(opts.stopX) > m.l + iw - 90;
+    s.append(svg("text", { x: X(opts.stopX) + (nearEdge ? -5 : 5), y: m.t - 9, "text-anchor": nearEdge ? "end" : "start",
+      "font-size": 11, "font-weight": 600, fill: "var(--text)" }, "safety stop"));
+  }
+  // series: 2px line, then markers (OK = dot, failed = ✕)
+  if (points.length > 1) {
+    s.append(svg("path", { d: points.map((p, i) => `${i ? "L" : "M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(""),
+      fill: "none", stroke: "var(--series)", "stroke-width": 2, "stroke-linejoin": "round", opacity: 0.55 }));
+  }
+  for (const p of points) {
+    const cx = X(p.x), cy = Y(p.y);
+    if (p.ok) s.append(svg("circle", { cx, cy, r: 4, fill: "var(--series)", stroke: "var(--surface)", "stroke-width": 2 }));
+    else s.append(svg("path", { d: `M${cx - 5},${cy - 5}L${cx + 5},${cy + 5}M${cx + 5},${cy - 5}L${cx - 5},${cy + 5}`,
+      stroke: "var(--critical)", "stroke-width": 2.5, "stroke-linecap": "round" }));
+  }
+  // hover: crosshair snaps to the nearest probe
+  const hair = svg("line", { y1: m.t, y2: m.t + ih, stroke: "var(--text-3)", "stroke-width": 1, visibility: "hidden" });
+  const ring = svg("circle", { r: 7, fill: "none", stroke: "var(--text)", "stroke-width": 1.5, visibility: "hidden" });
+  const hit = svg("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent", tabindex: 0 });
+  s.append(hair, ring, hit);
+  let focusIdx = -1;
+  function show(i) {
+    if (i < 0 || i >= points.length) return;
+    focusIdx = i;
+    const p = points[i], cx = X(p.x), cy = Y(p.y);
+    hair.setAttribute("x1", cx); hair.setAttribute("x2", cx); hair.setAttribute("visibility", "visible");
+    ring.setAttribute("cx", cx); ring.setAttribute("cy", cy); ring.setAttribute("visibility", "visible");
+    tip.replaceChildren(
+      el("strong", {}, `${p.ok ? "OK" : "FAIL"} · ${fmtMs(p.y)}`), el("br"),
+      el("span", { class: "muted" }, `status ${p.status ?? "—"} · ${p.phase} · +${p.x.toFixed(1)} s`));
+    tip.style.display = "block";
+    const scale = wrap.clientWidth / W;
+    const left = cx * scale, tw = tip.offsetWidth;
+    tip.style.left = `${Math.min(Math.max(0, left - tw / 2), wrap.clientWidth - tw)}px`;
+    tip.style.top = `${Math.max(0, cy * scale - tip.offsetHeight - 14)}px`;
+  }
+  function hide() { hair.setAttribute("visibility", "hidden"); ring.setAttribute("visibility", "hidden"); tip.style.display = "none"; }
+  hit.addEventListener("pointermove", e => {
+    if (!points.length) return;
+    const r = s.getBoundingClientRect(), x = ((e.clientX - r.left) / r.width) * W;
+    let best = 0;
+    points.forEach((p, i) => { if (Math.abs(X(p.x) - x) < Math.abs(X(points[best].x) - x)) best = i; });
+    show(best);
+  });
+  hit.addEventListener("pointerleave", hide);
+  hit.addEventListener("blur", hide);
+  hit.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight") { show(Math.min(points.length - 1, focusIdx + 1)); e.preventDefault(); }
+    if (e.key === "ArrowLeft") { show(Math.max(0, focusIdx - 1)); e.preventDefault(); }
+  });
+  hit.addEventListener("focus", () => show(Math.max(0, focusIdx)));
+  wrap.prepend(s);
+  return wrap;
+}
+function legend(items) {
+  const L = el("div", { class: "legend" });
+  const sw = {
+    ok: () => { const s = svg("svg", { width: 12, height: 12 }); s.append(svg("circle", { cx: 6, cy: 6, r: 4, fill: "var(--series)" })); return s; },
+    fail: () => { const s = svg("svg", { width: 12, height: 12 }); s.append(svg("path", { d: "M2,2L10,10M10,2L2,10", stroke: "var(--critical)", "stroke-width": 2.5, "stroke-linecap": "round" })); return s; },
+    band: () => { const s = svg("svg", { width: 16, height: 12 }); s.append(svg("rect", { x: 0, y: 0, width: 16, height: 12, fill: "var(--band)", stroke: "var(--band-edge)" })); return s; },
+    limit: () => { const s = svg("svg", { width: 18, height: 12 }); s.append(svg("line", { x1: 0, x2: 18, y1: 6, y2: 6, stroke: "var(--text-2)", "stroke-dasharray": "5 4" })); return s; },
+    stop: () => { const s = svg("svg", { width: 8, height: 12 }); s.append(svg("line", { x1: 4, x2: 4, y1: 0, y2: 12, stroke: "var(--text)", "stroke-width": 1.5 })); return s; },
+  };
+  for (const [k, text] of items) L.append(el("span", {}, sw[k](), text));
+  return L;
+}
+
+/* ------------------------------------------------------------------ views */
+let liveTimer = null;
+function stopLive() { if (liveTimer) { clearInterval(liveTimer); liveTimer = null; } }
+
+async function viewRuns() {
+  app.replaceChildren(el("h1", {}, "Experiment runs"), el("p", { class: "sub" }, "Loading…"));
+  let data;
+  try { data = await getJSON("/api/runs"); }
+  catch (e) { app.replaceChildren(el("h1", {}, "Experiment runs"), el("p", { class: "empty" }, `Couldn't load runs: ${e.message}`)); return; }
+  const runs = data.runs.filter(r => r.run_id);
+  const header = [el("h1", {}, "Experiment runs"),
+    el("p", { class: "sub" }, "Every experiment FaultOrbit has saved on this machine. Select a run to see its timeline.")];
+  if (!runs.length) {
+    app.replaceChildren(...header, el("div", { class: "card empty" },
+      "No runs yet. Start the app, then run an experiment, e.g. ", el("code", {}, "python -m chaos.controller experiments/hotel_geo_stop.json"),
+      ". See docs/demo.md."));
+    return;
+  }
+  const safety = runs.filter(r => (r.stop_reason || "").startsWith("safety")).length;
+  const refused = runs.filter(r => (r.stop_reason || "").startsWith("refused")).length;
+  const injected = runs.length - refused;
+  const recovered = runs.filter(r => r.recovered).length;
+  const recTimes = runs.filter(r => r.recovered && r.recovery_s != null).map(r => r.recovery_s).sort((a, b) => a - b);
+  const mid = Math.floor(recTimes.length / 2);
+  const median = !recTimes.length ? null : recTimes.length % 2 ? recTimes[mid] : (recTimes[mid - 1] + recTimes[mid]) / 2;
+  const notRec = runs.filter(r => !r.recovered && !(r.stop_reason || "").startsWith("refused")).length;
+  const tiles = el("div", { class: "tiles" },
+    tile("Runs", String(runs.length), refused ? `${refused} refused by pre-flight check` : "all injected a fault"),
+    tile("Stopped by safety rules", String(safety), injected ? `${Math.round(safety / injected * 100)}% of injected runs` : null),
+    tile("Recovered", `${recovered} / ${injected}`, notRec ? `${notRec} did not recover on their own` : "every run recovered"),
+    tile("Median recovery", fmtS(median), "after the fault was removed"));
+
+  const search = el("input", { type: "search", placeholder: "Filter by experiment, target or stop reason", "aria-label": "Filter runs" });
+  const tbody = el("tbody");
+  const table = el("table", {},
+    el("thead", {}, el("tr", {},
+      el("th", {}, "When"), el("th", {}, "Experiment"), el("th", { class: "hide-sm" }, "Target"),
+      el("th", { class: "hide-sm" }, "Stop reason"), el("th", { class: "num" }, "Errors during"),
+      el("th", { class: "num hide-sm" }, "p95 during"), el("th", {}, "Outcome"))),
+    tbody);
+  function fill() {
+    const q = search.value.trim().toLowerCase();
+    tbody.replaceChildren();
+    for (const r of runs) {
+      const hay = `${r.experiment} ${r.target} ${r.stop_reason}`.toLowerCase();
+      if (q && !hay.includes(q)) continue;
+      const go = () => { location.hash = `#/run/${encodeURIComponent(r.run_id)}`; };
+      tbody.append(el("tr", { class: "link", tabindex: 0, onclick: go, onkeydown: e => { if (e.key === "Enter") go(); } },
+        el("td", { class: "mono" }, runWhen(r.run_id)),
+        el("td", {}, r.experiment || "–"),
+        el("td", { class: "mono hide-sm" }, r.target || "–"),
+        el("td", { class: "hide-sm" }, r.stop_reason || "–"),
+        el("td", { class: "num" }, fmtPct(r.during_error_rate)),
+        el("td", { class: "num hide-sm" }, fmtMs(r.during_p95_ms)),
+        el("td", {}, pill(outcome(r)))));
+    }
+    if (!tbody.children.length) tbody.append(el("tr", {}, el("td", { colspan: 7, class: "empty" }, "No runs match the filter.")));
+  }
+  search.addEventListener("input", fill);
+  fill();
+  app.replaceChildren(...header, tiles,
+    el("div", { class: "card" }, el("div", { class: "toolbar" }, search), el("div", { class: "scroll" }, table)));
+}
+
+async function viewRun(id) {
+  app.replaceChildren(el("a", { class: "back", href: "#/" }, "← All runs"), el("p", { class: "sub" }, "Loading…"));
+  let r;
+  try { r = await getJSON(`/api/runs/${encodeURIComponent(id)}`); }
+  catch (e) { app.replaceChildren(el("a", { class: "back", href: "#/" }, "← All runs"), el("p", { class: "empty" }, `Couldn't load this run: ${e.message}`)); return; }
+  const exp = r.experiment || {};
+  const all = [...(r.baseline || []).map(s => ({ ...s, phase: "baseline" })),
+               ...(r.during || []).map(s => ({ ...s, phase: "during fault" })),
+               ...(r.recovery || []).map(s => ({ ...s, phase: "recovery" }))];
+  const t0 = all.length ? all[0].t : (r.fault_started || 0);
+  const points = all.map(s => ({ x: Math.max(0, s.t - t0), y: s.latency_ms || 0, ok: !!s.ok, status: s.status, phase: s.phase }));
+  const band = r.fault_started ? [r.fault_started - t0, (r.fault_ended || r.fault_started) - t0] : null;
+  const stopX = (r.stop_reason || "").startsWith("safety") && r.during && r.during.length
+    ? r.during[r.during.length - 1].t - t0 : null;
+  const sum = r.summary || {}, base = sum.baseline || {}, dur = sum.during || {};
+  const o = outcome(r);
+
+  const headline = (r.stop_reason || "").startsWith("refused")
+    ? "Refused before injecting: the app was already unhealthy"
+    : `${(r.stop_reason || "finished").replace(/^safety: /, "Stopped by safety rule: ")} · ${o.text.toLowerCase()}`;
+
+  const tiles = el("div", { class: "tiles" },
+    tile("Stop reason", r.stop_reason || "–", null, true),
+    tile("Failed probes during fault", dur.count ? `${dur.failures} / ${dur.count}` : "–", dur.count ? `${fmtPct(dur.error_rate)} error rate` : null),
+    tile("p95 latency during fault", fmtMs(dur.p95_ms),
+      dur.p95_ms == null && dur.count ? `no successful probes · baseline ${fmtMs(base.p95_ms)}` : `baseline ${fmtMs(base.p95_ms)}`),
+    tile("Outcome", pill(o), r.recovered ? "after the fault was removed" : (r.stop_reason || "").startsWith("refused") ? "no fault injected" : "manual restart needed"));
+
+  const probeRows = el("tbody", {}, all.map((s, i) => el("tr", {},
+    el("td", {}, s.phase), el("td", { class: "num" }, `+${points[i].x.toFixed(1)} s`),
+    el("td", {}, s.ok ? "OK" : "FAIL"), el("td", { class: "num" }, s.status ?? "—"), el("td", { class: "num" }, fmtMs(s.latency_ms)))));
+
+  app.replaceChildren(
+    el("a", { class: "back", href: "#/" }, "← All runs"),
+    el("h1", {}, exp.name || id),
+    el("p", { class: "sub" }, `${exp.fault || "fault"} on `, el("span", { class: "mono" }, exp.target || "?"),
+      ` · ${runWhen(id)} · run `, el("span", { class: "mono" }, id)),
+    tiles,
+    el("div", { class: "card" },
+      el("h2", {}, headline),
+      el("p", { class: "sub" }, "Each mark is one probe of the app. Hover or use the arrow keys for details."),
+      legend([["ok", "OK probe"], ["fail", "Failed probe"], ["band", "Fault active"], ["limit", "Latency limit"]]
+        .concat(stopX != null ? [["stop", "Safety stop"]] : [])),
+      points.length ? timeline(points, { band, limit: r.latency_limit_ms, stopX, xLabel: "seconds since start",
+        label: `Probe latency over time for ${exp.name || id}` }) : el("p", { class: "empty" }, "This run has no probe samples.")),
+    el("div", { class: "card" },
+      el("details", {}, el("summary", {}, `Probe table (${all.length} probes)`),
+        el("div", { class: "scroll" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "Phase"), el("th", { class: "num" }, "Time"),
+          el("th", {}, "Result"), el("th", { class: "num" }, "Status"), el("th", { class: "num" }, "Latency"))), probeRows))),
+      el("p", { class: "sub", style: "margin:10px 0 0" }, "Raw record: ", el("a", { href: `/api/runs/${encodeURIComponent(id)}` }, "JSON"))));
+}
+
+function viewLive() {
+  const DEFAULT = "http://127.0.0.1:5000/hotels?inDate=2015-04-09&outDate=2015-04-10&lat=38.0235&lon=-122.095";
+  let url = DEFAULT, running = true, samples = [], start = null;
+  const input = el("input", { type: "text", value: url, "aria-label": "URL to probe" });
+  const toggle = el("button", { class: "btn", type: "button" }, "Pause");
+  const apply = el("button", { class: "btn", type: "button" }, "Probe this URL");
+  const tiles = el("div", { class: "tiles" });
+  const chartBox = el("div");
+  const note = el("p", { class: "sub" }, "Probes once a second, like python -m chaos.watch. Read-only: it only sends GET requests to localhost.");
+  function render() {
+    const last = samples[samples.length - 1];
+    const fails = samples.filter(s => !s.ok).length;
+    tiles.replaceChildren(
+      tile("Now", last ? pill(last.ok ? { cls: "good", ic: "✓", text: "OK" } : { cls: "bad", ic: "✕", text: "FAIL" }) : "–",
+        last ? `status ${last.status ?? "—"}` : "waiting for first probe"),
+      tile("Latency", last ? fmtMs(last.latency_ms) : "–", "latest probe"),
+      tile("Failed (last 60 s)", `${fails} / ${samples.length}`, null),
+      tile("Slowest (last 60 s)", samples.length ? fmtMs(Math.max(...samples.map(s => s.latency_ms))) : "–", null));
+    const now = samples.length ? samples[samples.length - 1].t : 0;
+    const pts = samples.map(s => ({ x: 60 - Math.min(60, now - s.t), y: s.latency_ms, ok: s.ok, status: s.status, phase: "live" }));
+    chartBox.replaceChildren(
+      legend([["ok", "OK probe"], ["fail", "Failed probe"]]),
+      timeline(pts, { xMin: 60, xLabel: "last 60 seconds (right = now)", label: "Live probe latency, last 60 seconds" }));
+  }
+  async function tick() {
+    if (!running) return;
+    try {
+      const d = await getJSON(`/api/live?url=${encodeURIComponent(url)}`);
+      showFault(d.active_fault);
+      samples.push(d.sample);
+      const cutoff = d.sample.t - 60;
+      samples = samples.filter(s => s.t >= cutoff);
+      render();
+    } catch (e) { note.textContent = `Live probe failed: ${e.message}`; }
+  }
+  toggle.addEventListener("click", () => { running = !running; toggle.textContent = running ? "Pause" : "Resume"; });
+  apply.addEventListener("click", () => { url = input.value.trim() || DEFAULT; samples = []; render(); });
+  app.replaceChildren(el("h1", {}, "Live monitor"), note,
+    el("div", { class: "toolbar" }, input, apply, toggle), tiles, el("div", { class: "card" }, chartBox));
+  render(); tick();
+  liveTimer = setInterval(tick, 1000);
+}
+
+/* ------------------------------------------------------------------ router */
+function route() {
+  stopLive();
+  const h = location.hash || "#/";
+  document.getElementById("nav-runs").toggleAttribute("aria-current", !h.startsWith("#/live"));
+  document.getElementById("nav-live").toggleAttribute("aria-current", h.startsWith("#/live"));
+  if (h.startsWith("#/live")) { document.getElementById("nav-live").setAttribute("aria-current", "page"); return viewLive(); }
+  document.getElementById("nav-runs").setAttribute("aria-current", "page");
+  if (h.startsWith("#/run/")) return viewRun(decodeURIComponent(h.slice(6)));
+  return viewRuns();
+}
+window.addEventListener("hashchange", route);
+let resizeT; window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (!location.hash.startsWith("#/live")) route(); }, 200); });
+route();
+</script>
+</body>
+</html>
