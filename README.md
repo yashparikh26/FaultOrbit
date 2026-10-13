@@ -73,7 +73,7 @@ These are defects in upstream DeathStarBench, surfaced automatically by the cont
 - [Dependency map](docs/dependency-map.json): machine-readable, used by the controller and the agents ([diagram](docs/dependency-map.mmd))
 - [Baseline](docs/baseline.md): wrk2 steady-state latency
 - [Safety controller and results store](docs/SAFETY.md)
-- [Demo runbook](docs/demo.md)
+- [Hands-on demo](docs/demo.md): run the app, inject faults and watch them live, step by step
 
 ## Setup
 
@@ -246,10 +246,15 @@ python -m chaos.controller experiments/dummy_web_stop.json
 python -m chaos.controller experiments/hotel_geo_stop.json
 python -m chaos.controller experiments/hotel_memcached_rate_stop.json
 
+# Watch it live in a second terminal (one line per second: OK/FAIL, latency):
+python -m chaos.watch
+
 # Past runs:
 python -m chaos.hooks list
 python -m chaos.hooks show <run_id>
 ```
+
+New here? Follow the [hands-on demo](docs/demo.md): it walks through all three experiments with what to expect in the terminal, the browser and Jaeger.
 
 - **Experiments** (`experiments/*.json`): target, fault, duration, probe URL, baseline samples.
 - **Policy** (`chaos/policy.json`): allowed targets and faults, max duration, hard timeout, and
