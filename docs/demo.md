@@ -32,6 +32,7 @@ python -m chaos.controller --recover   # should say "nothing to recover"
 | Browser tab: the app | `http://127.0.0.1:5000/hotels?inDate=2015-04-09&outDate=2015-04-10&lat=38.0235&lon=-122.095` | Hotel results as JSON when healthy; an error or a slow load during a fault. Refresh it during each experiment. The front page is `http://localhost:5000` |
 | Browser tab: traces | `http://localhost:16686` → service `frontend` → **Find Traces** | Each request across all services; failed calls show errors, slow ones show long bars |
 | Second terminal: live monitor | `python -m chaos.watch` | One line per second: OK/FAIL, status and latency with a bar. Stop with Ctrl+C for a summary |
+| Dashboard (optional) | `python -m chaos.dashboard --open` → **Live** tab | The same monitor as a chart in the browser, a banner while a fault is active, and every finished run on the **Runs** tab |
 
 The monitor probes the same URL as the experiments. For another target, pass it: `python -m chaos.watch http://127.0.0.1:8081/`.
 
@@ -92,6 +93,10 @@ python -m chaos.controller experiments/hotel_rate_delay.json
 The first run downloads the Pumba (`gaiaadm/pumba`) and `tc` (`gaiadocker/iproute2`) images. These are amd64-only, and the delay is not observable through Docker Desktop for Mac's port forwarding, so run this experiment on an Intel/AMD machine.
 
 ## 4. Look at the results
+
+In the dashboard (`python -m chaos.dashboard --open`), the **Runs** tab lists every run; select one to see its timeline: probes before, during and after the fault, the safety stop and recovery.
+
+Or in the terminal:
 
 ```powershell
 python -m chaos.hooks list             # one row per run: error %, p95, recovery time, stop reason

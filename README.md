@@ -47,6 +47,20 @@ Dependency map ──► Experiment controller ──► Fault injection (Docker
 
 Details: [docs/SAFETY.md](docs/SAFETY.md).
 
+## Dashboard
+
+```powershell
+python -m chaos.dashboard --open      # http://127.0.0.1:8765
+```
+
+A local, read-only web dashboard (standard library only, no installs):
+
+- **Runs:** summary tiles (runs, safety stops, recovery rate, median recovery time) and a filterable table of every saved run.
+- **Run detail:** a timeline of every probe (failures marked ✕) with the fault window shaded, the safety-stop moment, the baseline-derived latency limit, and recovery. Hover or use the arrow keys for each probe; a probe table is included.
+- **Live:** a rolling 60-second chart of the app's health, plus a banner whenever a fault is active.
+
+It listens on 127.0.0.1, only reads `results/`, and only sends GET probes to localhost. Experiments still run through the controller, so the dashboard can't bypass the safety policy.
+
 ## AI backends
 
 Agents call a model through `agents/llm.py`, which asks for JSON matching a schema, validates the answer, retries once with the errors, and logs every call (backend, model, prompt version, duration, cost) to `results/llm_calls.jsonl`. Choose a backend with `FAULTORBIT_LLM`:
@@ -80,6 +94,7 @@ These are defects in upstream DeathStarBench, surfaced automatically by the cont
 - [x] Experiment controller with container-stop and network-delay faults
 - [x] Safety controller and results store
 - [x] Agent foundation: model backends (Claude Code, Ollama), schema-checked JSON, call log
+- [x] Local dashboard: runs, per-run timeline, live monitor
 - [ ] Analyst agent: reads saved runs, ranks weaknesses by severity, suggests fixes, computes a resilience score
 - [ ] Planner agent: proposes the next experiment from the dependency map and past runs, validated against the policy
 - [ ] Closed loop with human approval: plan → approve → run → analyse
